@@ -2,44 +2,51 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Item;
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreItemRequest;
+use App\Http\Requests\UpdateItemRequest; 
+use App\Services\ItemService;
+use App\Http\Controllers\Api\BaseController;
+use Exception;
 
-class ItemController extends Controller
+class ItemController extends BaseController 
 {
-    public function index() {
-        // Mengembalikan semua data barang (Skenario c)
-        return response()->json(Item::all(), 200);
+    protected $svc;
+
+    public function __construct(ItemService $svc)
+    { 
+        $this->svc = $svc;
     }
 
-    public function store(Request $request) {
-        $item = Item::create($request->all());
-        return response()->json($item, 201);
+    public function index()
+    {
+        return $this->success($this->svc->all()); 
     }
 
-    public function show($id) {
-        $item = Item::find($id);
-        if (!$item) return response()->json(['message' => 'Barang gak ketemu!'], 404);
-        return response()->json($item, 200);
+    public function store(StoreItemRequest $req)
+    { 
+        $item = $this->svc->create($req->validated()); 
+        return $this->success($item, "Item dibuat", 201); 
     }
 
-    public function update(Request $request, $id) {
-        $item = Item::find($id);
-        if (!$item) return response()->json(['message' => 'Barang gak ketemu!'], 404);
-        $item->update($request->all());
-        return response()->json($item, 200);
-    }
-
-    public function destroy($id) {
-        // Cek apakah user yang login rolenya beneran admin
-        if (auth()->user()->role !== 'admin') {
-            return response()->json(['message' => 'This action is unauthorized.'], 403);
+    public function show($id) 
+    {
+        try {
+            $item = $this->svc->find($id);
+            return $this->success($item);
+        } catch (Exception $e) {
+            return $this->error($e->getMessage(), 404); 
         }
+    }
 
-        $item = Item::find($id);
-        if (!$item) return response()->json(['message' => 'Barang gak ketemu!'], 404);
-        
-        $item->delete();
-        return response()->json(['message' => 'Barang berhasil dihapus'], 200);
+    public function update(UpdateItemRequest $req, $id) 
+    { 
+        $item = $this->svc->update($id, $req->validated());
+        return $this->success($item, "Item diperbarui"); 
+    }
+
+    public function destroy($id) 
+    {
+        $this->svc->delete($id);
+        return $this->success(null, "Item dihapus", 200); 
     }
 }
