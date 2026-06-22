@@ -2,68 +2,41 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Item;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use App\Models\Item;
+use App\Http\Controllers\Controller; // Menggunakan Controller standar bawaan Laravel
 
 class ItemController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        return response()->json(Item::with('category')->get());
-    }
-
-    public function store(Request $request)
-    {
-        // Pake cara ini biar response error-nya JSON, bukan redirect HTML
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string',
-            'quantity' => 'required|integer',
-            'price' => 'required|numeric',
-            'category_id' => 'required|exists:categories,id'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Validasi gagal, cek inputan lo!',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
         try {
-            $item = Item::create($request->all());
-            return response()->json($item, 201);
-        } catch (\Exception $e) {
+            // 1. Cek query dasar dari model Item
+            $query = Item::query();
+
+            // 2. Jika ada parameter category_id, lakukan filter
+            if ($request->filled('category_id')) {
+                $query->where('category_id', $request->category_id);
+            }
+
+            // 3. Ambil data hasil query
+            $items = $query->get();
+
+            // 4. Kembalikan response JSON sukses standar
             return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
+                'success' => true,
+                'data' => $items
+            ], 200);
+
+        } catch (\Throwable $e) {
+            // JIKA TERJADI ERROR: Tangkap pesan error aslinya dan kirim ke Postman dalam bentuk JSON
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan sistem!',
+                'error_message' => $e->getMessage(), // Menampilkan pesan error asli (misal: Table not found)
+                'error_file' => $e->getFile(),       // Menampilkan file penyebab error
+                'error_line' => $e->getLine()        // Menampilkan baris kode penyebab error
             ], 500);
         }
-    }
-
-    public function show($id)
-    {
-        $item = Item::with('category')->find($id);
-        if (!$item) return response()->json(['message' => 'Barang gak ada'], 404);
-        return response()->json($item);
-    }
-
-    public function update(Request $request, $id)
-    {
-        $item = Item::find($id);
-        if (!$item) return response()->json(['message' => 'Gak ketemu barangnya'], 404);
-        
-        $item->update($request->all()); 
-        return response()->json($item);
-    }
-
-    public function destroy($id)
-    {
-        $item = Item::find($id);
-        if (!$item) return response()->json(['message' => 'Barang emang udah gak ada'], 404);
-        
-        $item->delete();
-        return response()->json(null, 204);
     }
 }
